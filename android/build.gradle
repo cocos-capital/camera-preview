@@ -13,10 +13,12 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.0.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21"
     }
 }
 
 apply plugin: 'com.android.library'
+apply plugin: plugins.kotlin
 
 android {
     namespace "com.ahm.capacitor.camera.preview.capacitorcamerapreview"
