@@ -194,40 +194,40 @@ public class CameraPreview: CAPPlugin {
         }
     }
 
-    @objc func captureSample(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            let quality: Int? = call.getInt("quality", 85)
+    // @objc func captureSample(_ call: CAPPluginCall) {
+    //     DispatchQueue.main.async {
+    //         let quality: Int? = call.getInt("quality", 85)
 
-            self.cameraController.captureSample { image, error in
-                guard let image = image else {
-                    print("Image capture error: \(String(describing: error))")
-                    call.reject("Image capture error: \(String(describing: error))")
-                    return
-                }
+    //         self.cameraController.captureSample { image, error in
+    //             guard let image = image else {
+    //                 print("Image capture error: \(String(describing: error))")
+    //                 call.reject("Image capture error: \(String(describing: error))")
+    //                 return
+    //             }
 
-                let imageData: Data?
-                if self.cameraPosition == "front" {
-                    let flippedImage = image.withHorizontallyFlippedOrientation()
-                    imageData = flippedImage.jpegData(compressionQuality: CGFloat(quality!/100))
-                } else {
-                    imageData = image.jpegData(compressionQuality: CGFloat(quality!/100))
-                }
+    //             let imageData: Data?
+    //             if self.cameraPosition == "front" {
+    //                 let flippedImage = image.withHorizontallyFlippedOrientation()
+    //                 imageData = flippedImage.jpegData(compressionQuality: CGFloat(quality!/100))
+    //             } else {
+    //                 imageData = image.jpegData(compressionQuality: CGFloat(quality!/100))
+    //             }
 
-                if self.storeToFile == false {
-                    let imageBase64 = imageData?.base64EncodedString()
-                    call.resolve(["value": imageBase64!])
-                } else {
-                    do {
-                        let fileUrl = self.getTempFilePath()
-                        try imageData?.write(to: fileUrl)
-                        call.resolve(["value": fileUrl.absoluteString])
-                    } catch {
-                        call.reject("Error writing image to file")
-                    }
-                }
-            }
-        }
-    }
+    //             if self.storeToFile == false {
+    //                 let imageBase64 = imageData?.base64EncodedString()
+    //                 call.resolve(["value": imageBase64!])
+    //             } else {
+    //                 do {
+    //                     let fileUrl = self.getTempFilePath()
+    //                     try imageData?.write(to: fileUrl)
+    //                     call.resolve(["value": fileUrl.absoluteString])
+    //                 } catch {
+    //                     call.reject("Error writing image to file")
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     @objc func getSupportedFlashModes(_ call: CAPPluginCall) {
         do {
@@ -268,36 +268,36 @@ public class CameraPreview: CAPPlugin {
         }
     }
 
-    @objc func startRecordVideo(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
+    // @objc func startRecordVideo(_ call: CAPPluginCall) {
+    //     DispatchQueue.main.async {
 
-            let quality: Int? = call.getInt("quality", 85)
+    //         let quality: Int? = call.getInt("quality", 85)
 
-            self.cameraController.captureVideo { (image, error) in
+    //         self.cameraController.captureVideo { (image, error) in
 
-                guard let image = image else {
-                    print(error ?? "Image capture error")
-                    guard let error = error else {
-                        call.reject("Image capture error")
-                        return
-                    }
-                    call.reject(error.localizedDescription)
-                    return
-                }
+    //             guard let image = image else {
+    //                 print(error ?? "Image capture error")
+    //                 guard let error = error else {
+    //                     call.reject("Image capture error")
+    //                     return
+    //                 }
+    //                 call.reject(error.localizedDescription)
+    //                 return
+    //             }
 
-                // self.videoUrl = image
+    //             // self.videoUrl = image
 
-                call.resolve(["value": image.absoluteString])
-            }
-        }
-    }
+    //             call.resolve(["value": image.absoluteString])
+    //         }
+    //     }
+    // }
 
-    @objc func stopRecordVideo(_ call: CAPPluginCall) {
+    // @objc func stopRecordVideo(_ call: CAPPluginCall) {
 
-        self.cameraController.stopRecording { (_) in
+    //     self.cameraController.stopRecording { (_) in
 
-        }
-    }
+    //     }
+    // }
 
 }
 
