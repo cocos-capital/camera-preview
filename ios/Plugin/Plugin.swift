@@ -300,7 +300,14 @@ public class CameraPreview: CAPPlugin {
 }
 
 extension CameraPreview: CameraControllerDelegate {
-    func hasRecognize(step: String) {
-        notifyListeners("faceRecognized", data: ["step": step])
+    func hasRecognize(step: String, bounds: CGRect) {
+        let data: [String : Any] = [
+            "step": step,
+            "x": bounds.origin.x,
+            "y": bounds.origin.y,
+            "width": bounds.width,
+            "height": bounds.height,
+        ]
+        notifyListeners("faceRecognized", data: data)
     }
 }

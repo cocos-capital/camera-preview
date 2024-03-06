@@ -10,7 +10,7 @@ import AVFoundation
 import UIKit
 
 protocol CameraControllerDelegate: NSObjectProtocol {
-    func hasRecognize(step: String)
+    func hasRecognize(step: String, bounds: CGRect)
 }
 
 class CameraController: NSObject {
@@ -509,13 +509,20 @@ extension CameraController: AVCaptureMetadataOutputObjectsDelegate {
             self.faceMetadataObjects.removeFirst()
         }
         if (faceMetadataObjects.count < 14) { return }
-        let yawAvg = self.faceMetadataObjects.reduce(0, { $0 + ($1.yawAngle >= 180 ? $1.yawAngle - 360 : $1.yawAngle) }) / CGFloat(self.faceMetadataObjects.count)
-        if (yawAvg > 20 && yawAvg < 80) {
-            delegate?.hasRecognize(step: "IZQUIERDA")
-        } else if (yawAvg > -80 && yawAvg < -20) {
-            delegate?.hasRecognize(step: "DERECHA")
-        } else if (yawAvg > -10 && yawAvg < 10) {
-            delegate?.hasRecognize(step: "CENTRO")
+        
+        let transformedMetadataObject = previewLayer?.transformedMetadataObject(for: face)
+                    
+        if let faceBounds = transformedMetadataObject?.bounds,
+            let viewBounds = previewLayer?.layerRectConverted(fromMetadataOutputRect: faceBounds) {
+            
+            let yawAvg = self.faceMetadataObjects.reduce(0, { $0 + ($1.yawAngle >= 180 ? $1.yawAngle - 360 : $1.yawAngle) }) / CGFloat(self.faceMetadataObjects.count)
+            if (yawAvg > 20 && yawAvg < 80) {
+                delegate?.hasRecognize(step: "IZQUIERDA", bounds: viewBounds)
+            } else if (yawAvg > -80 && yawAvg < -20) {
+                delegate?.hasRecognize(step: "DERECHA", bounds: viewBounds)
+            } else if (yawAvg > -10 && yawAvg < 10) {
+                delegate?.hasRecognize(step: "CENTRO", bounds: viewBounds)
+            }
         }
     }
     
