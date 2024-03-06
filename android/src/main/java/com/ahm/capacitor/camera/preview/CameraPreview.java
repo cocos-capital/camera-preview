@@ -2,8 +2,6 @@ package com.ahm.capacitor.camera.preview;
 
 import static android.Manifest.permission.CAMERA;
 
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.graphics.Point;
@@ -16,6 +14,8 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.camera.core.CameraSelector;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
@@ -43,7 +43,7 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
     private String cameraStartCallbackId = "";
 
     // keep track of previously specified orientation to support locking orientation:
-    private int previousOrientationRequest = -1;
+    private int previousOrientationRequest = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 
     private KNewCameraActivity fragment;
     private int containerViewId = 20;
@@ -124,7 +124,7 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
                         if (containerView != null) {
                             ((ViewGroup) getBridge().getWebView().getParent()).removeView(containerView);
                             getBridge().getWebView().setBackgroundColor(Color.WHITE);
-                            FragmentManager fragmentManager = getActivity().getFragmentManager();
+                            FragmentManager fragmentManager = getActivity().getSupportFragmentManager();
                             FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
                             fragmentTransaction.remove(fragment);
                             fragmentTransaction.commit();
@@ -280,7 +280,7 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
 //        fragment.tapToFocus = true;
 //        fragment.disableExifHeaderStripping = disableExifHeaderStripping;
 //        fragment.storeToFile = storeToFile;
-//        fragment.toBack = toBack;
+        fragment.setToBack(toBack);
 //        fragment.enableOpacity = enableOpacity;
 //        fragment.enableZoom = enableZoom;
 
@@ -347,7 +347,7 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
                                 setupBroadcast();
                             }
 
-                            FragmentManager fragmentManager = getBridge().getActivity().getFragmentManager();
+                            FragmentManager fragmentManager = getBridge().getActivity().getSupportFragmentManager();
                             FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
                             fragmentTransaction.add(containerView.getId(), fragment);
                             fragmentTransaction.commit();
@@ -446,19 +446,19 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
         return fragment.hasCamera();
     }
 
-    private String getFilePath(String filename) {
-        String fileName = filename;
-
-        int i = 1;
-
-        while (new File(VIDEO_FILE_PATH + fileName + VIDEO_FILE_EXTENSION).exists()) {
-            // Add number suffix if file exists
-            fileName = filename + '_' + i;
-            i++;
-        }
-
-        return VIDEO_FILE_PATH + fileName + VIDEO_FILE_EXTENSION;
-    }
+//    private String getFilePath(String filename) {
+//        String fileName = filename;
+//
+//        int i = 1;
+//
+//        while (new File(VIDEO_FILE_PATH + fileName + VIDEO_FILE_EXTENSION).exists()) {
+//            // Add number suffix if file exists
+//            fileName = filename + '_' + i;
+//            i++;
+//        }
+//
+//        return VIDEO_FILE_PATH + fileName + VIDEO_FILE_EXTENSION;
+//    }
 
     private void setupBroadcast() {
         /** When touch event is triggered, relay it to camera view if needed so it can support pinch zoom */
@@ -470,8 +470,8 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
                 new View.OnTouchListener() {
                     @Override
                     public boolean onTouch(View v, MotionEvent event) {
-                        if ((null != fragment) && (fragment.toBack == true)) {
-                            fragment.frameContainerLayout.dispatchTouchEvent(event);
+                        if ((null != fragment) && (fragment.getToBack() == true)) {
+//                            fragment.frameContainerLayout.dispatchTouchEvent(event);
                         }
                         return false;
                     }
