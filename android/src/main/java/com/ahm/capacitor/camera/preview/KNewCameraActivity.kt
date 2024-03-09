@@ -4,10 +4,7 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Matrix
+import android.graphics.Rect
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Build
@@ -31,6 +28,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.ahm.capacitor.camera.preview.capacitorcamerapreview.databinding.NewCameraActivityBinding
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import java.text.SimpleDateFormat
@@ -38,22 +36,17 @@ import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-typealias FaceAnalyzerListener = (analyzer: Double) -> Unit
+typealias FaceRotationAnalyzerListener = (rotationAnalyzer: String, bounds: Rect?) -> Unit
 
 class KNewCameraActivity : Fragment() {
     interface CameraPreviewListener {
         fun onPictureTaken(originalPicture: String?)
         fun onPictureTakenError(message: String?)
-        //        fun onSnapshotTaken(originalPicture: String?)
-        //        fun onSnapshotTakenError(message: String?)
-        fun onFocusSet(pointX: Int, pointY: Int)
-        fun onFocusSetError(message: String?)
-        //        fun onBackButton()
+        //        fun onFocusSet(pointX: Int, pointY: Int)
+//        fun onFocusSetError(message: String?)
+//        fun onBackButton()
         fun onCameraStarted()
-        //        fun onStartRecordVideo()
-        //        fun onStartRecordVideoError(message: String?)
-        //        fun onStopRecordVideo(file: String?)
-        //        fun onStopRecordVideoError(error: String?)
+        fun onCameraDetected(rotation: String, bounds: Rect?)
     }
 
     private var eventListener: CameraPreviewListener? = null
@@ -61,7 +54,7 @@ class KNewCameraActivity : Fragment() {
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
 
-//    private var opacity = 0f
+    //    private var opacity = 0f
     // The first rear facing camera
 //    private var defaultCameraId = 0
     var defaultCamera: CameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -100,24 +93,24 @@ class KNewCameraActivity : Fragment() {
     }
 
     private val activityResultLauncher =
-            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-                    permissions ->
-                // Handle Permission granted/rejected
-                var permissionGranted = true
-                permissions.entries.forEach {
-                    if (it.key in REQUIRED_PERMISSIONS && !it.value) permissionGranted = false
-                }
-                if (!permissionGranted) {
-                    Toast.makeText(requireContext(), "Permission request denied", Toast.LENGTH_SHORT).show()
-                } else {
-                    startCamera()
-                }
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+                permissions ->
+            // Handle Permission granted/rejected
+            var permissionGranted = true
+            permissions.entries.forEach {
+                if (it.key in REQUIRED_PERMISSIONS && !it.value) permissionGranted = false
             }
+            if (!permissionGranted) {
+                Toast.makeText(requireContext(), "Permission request denied", Toast.LENGTH_SHORT).show()
+            } else {
+                startCamera()
+            }
+        }
 
     override fun onCreateView(
-            inflater: LayoutInflater,
-            container: ViewGroup?,
-            savedInstanceState: Bundle?
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
     ): View {
         viewBinding = NewCameraActivityBinding.inflate(layoutInflater, container, false)
 
@@ -139,9 +132,9 @@ class KNewCameraActivity : Fragment() {
 
     fun switchCamera() {
         defaultCamera =
-                if (defaultCamera == CameraSelector.DEFAULT_BACK_CAMERA)
-                        CameraSelector.DEFAULT_FRONT_CAMERA
-                else CameraSelector.DEFAULT_BACK_CAMERA
+            if (defaultCamera == CameraSelector.DEFAULT_BACK_CAMERA)
+                CameraSelector.DEFAULT_FRONT_CAMERA
+            else CameraSelector.DEFAULT_BACK_CAMERA
         startCamera()
     }
 
@@ -177,41 +170,41 @@ class KNewCameraActivity : Fragment() {
         val name = SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(System.currentTimeMillis())
 
         val contentValues =
-                ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CocosCapital-Image")
-                    }
+            ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CocosCapital-Image")
                 }
+            }
 
         // Create output options object which contains file + metadata
         val outputOptions =
-                ImageCapture.OutputFileOptions.Builder(
-                                requireContext().contentResolver,
-                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                contentValues
-                        )
-                        .build()
+            ImageCapture.OutputFileOptions.Builder(
+                requireContext().contentResolver,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                contentValues
+            )
+                .build()
 
         // Set up image capture listener, which is triggered after photo has
         // been taken
         imageCapture.takePicture(
-                outputOptions,
-                ContextCompat.getMainExecutor(requireContext()),
-                object : ImageCapture.OnImageSavedCallback {
-                    override fun onError(exc: ImageCaptureException) {
-                        Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
-                        eventListener?.onPictureTakenError(exc.message)
-                    }
-
-                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        val msg = "Photo capture succeeded: ${output.savedUri}"
-                        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-                        Log.d(TAG, msg)
-                        eventListener?.onPictureTaken(output.savedUri.toString())
-                    }
+            outputOptions,
+            ContextCompat.getMainExecutor(requireContext()),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+                    eventListener?.onPictureTakenError(exc.message)
                 }
+
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    val msg = "Photo capture succeeded: ${output.savedUri}"
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, msg)
+                    eventListener?.onPictureTaken(output.savedUri.toString())
+                }
+            }
         )
     }
 
@@ -219,51 +212,55 @@ class KNewCameraActivity : Fragment() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
 
         cameraProviderFuture.addListener(
-                {
-                    // Used to bind the lifecycle of cameras to the lifecycle owner
-                    val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            {
+                // Used to bind the lifecycle of cameras to the lifecycle owner
+                val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-                    // Preview
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
-                    }
+                // Preview
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
+                }
 
-                    imageCapture = ImageCapture.Builder()
+                imageCapture = ImageCapture.Builder()
 //                        .setTargetResolution(Size(1080, 1920)) // Set target resolution here
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY) // Set capture mode here
-                        .build()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY) // Set capture mode here
+                    .build()
 
-                    val imageAnalyzer = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
-                        .also {
-                            it.setAnalyzer(cameraExecutor, FaceAnalyzer { eulerY ->
-                                Log.d(TAG, "eulerY: $eulerY")
-                            })
-                        }
-
-                    // Select back camera as a default
-                    val cameraSelector = defaultCamera
-
-                    try {
-                        // Unbind use cases before rebinding
-                        cameraProvider.unbindAll()
-
-                        // Bind use cases to camera
-                        cameraProvider.bindToLifecycle(
-                                this,
-                                cameraSelector,
-                                preview,
-                                imageCapture,
-                                imageAnalyzer
-                        )
-
-                        eventListener?.onCameraStarted()
-                    } catch (exc: Exception) {
-                        Log.e(TAG, "Use case binding failed", exc)
+                val imageAnalyzer = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also { it ->
+                        it.setAnalyzer(cameraExecutor, FaceAnalyzer { rotation, bounds ->
+                            Log.d(TAG, "Rotation: $rotation")
+                            bounds?.let{ rect ->
+                                Log.d(TAG, "Bounds: ${rect.flattenToString()}")
+                            }
+                            eventListener?.onCameraDetected(rotation, bounds)
+                        })
                     }
-                },
-                ContextCompat.getMainExecutor(requireContext())
+
+                // Select back camera as a default
+                val cameraSelector = defaultCamera
+
+                try {
+                    // Unbind use cases before rebinding
+                    cameraProvider.unbindAll()
+
+                    // Bind use cases to camera
+                    cameraProvider.bindToLifecycle(
+                        this,
+                        cameraSelector,
+                        preview,
+                        imageCapture,
+                        imageAnalyzer
+                    )
+
+                    eventListener?.onCameraStarted()
+                } catch (exc: Exception) {
+                    Log.e(TAG, "Use case binding failed", exc)
+                }
+            },
+            ContextCompat.getMainExecutor(requireContext())
         )
     }
 
@@ -281,38 +278,51 @@ class KNewCameraActivity : Fragment() {
     }
 
     companion object {
-        private const val TAG = "CameraXApp"
+        private const val TAG = "CocosCapCameraPreview"
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private val REQUIRED_PERMISSIONS =
-            mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO).apply {
+            mutableListOf(Manifest.permission.CAMERA).apply {
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
                     add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }
             }.toTypedArray()
     }
 
-    private class FaceAnalyzer(listener: FaceAnalyzerListener? = null) : ImageAnalysis.Analyzer {
+    private class FaceAnalyzer(listener: FaceRotationAnalyzerListener? = null) : ImageAnalysis.Analyzer {
         private val faceDetector: FaceDetector = FaceDetection.getClient()
-        private val listeners = ArrayList<FaceAnalyzerListener>().apply { listener?.let { add(it) } }
+        private val listeners = ArrayList<FaceRotationAnalyzerListener>().apply { listener?.let { add(it) } }
+        private var faceObjects: MutableList<Face> = ArrayList()
 
         @ExperimentalGetImage
         override fun analyze(imageProxy: ImageProxy) {
-            val bitmap = getBitmapFromImageProxy(imageProxy)
-            if (bitmap != null) {
-                val inputImage = InputImage.fromBitmap(bitmap, 0)
-                faceDetector.process(inputImage)
+            val mediaImage = imageProxy.image
+            if (mediaImage != null) {
+                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                faceDetector.process(image)
                     .addOnSuccessListener { faces ->
-                        if (faces.size == 1) {
+                        if (faces.size == 0) {
+                            faceObjects.clear()
+                            listeners.forEach { it("NO_FACES", null) }
+                        } else if (faces.size > 1) {
+                            faceObjects.clear()
+                            listeners.forEach { it("MORE_THAN_ONE_FACE", null) }
+                        } else {
                             val face = faces[0]
-                            val eulerY: Float = face.headEulerAngleY // Euler Y angle represents the rotation around the vertical axis.
-                            Log.d(TAG, "Euler Y: $eulerY")
-                            listeners.forEach { it(eulerY.toDouble()) }
+                            faceObjects.add(face)
+                            if (faceObjects.size > 15) {
+                                faceObjects.removeFirst()
+                                // Euler Y angle represents the rotation around the vertical axis.
+                                val eulerY: Double = (faceObjects.sumOf { it.headEulerAngleY.toDouble() }) / faceObjects.size
+                                val bounds: Rect = face.boundingBox
 
-                            // Check if face turns right
-                            //                            if (eulerY > 30) {
-                            //                                // Face turns right logic here
-                            //                                Log.d(TAG, "Face turns right!")
-                            //                            }
+                                var rotation = "CENTER"
+                                if (eulerY > 28) {
+                                    rotation = "LEFT"
+                                } else if (eulerY < -28) {
+                                    rotation = "RIGHT"
+                                }
+                                listeners.forEach { it(rotation, bounds) }
+                            }
                         }
                     }
                     .addOnFailureListener { e ->
@@ -323,31 +333,6 @@ class KNewCameraActivity : Fragment() {
                 imageProxy.close()
             }
         }
-
-        @ExperimentalGetImage
-        private fun getBitmapFromImageProxy(imageProxy: ImageProxy): Bitmap? {
-            if (imageProxy.image != null) {
-                val bitmap =
-                        Bitmap.createBitmap(
-                                imageProxy.width,
-                                imageProxy.height,
-                                Bitmap.Config.ARGB_8888
-                        )
-                val matrix = Matrix()
-                matrix.postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-                val canvas = Canvas(bitmap)
-                canvas.drawBitmap(
-                        BitmapFactory.decodeByteArray(
-                                imageProxy.planes[0].buffer.array(),
-                                0,
-                                imageProxy.planes[0].buffer.remaining()
-                        ),
-                        matrix,
-                        null
-                )
-                return bitmap
-            }
-            return null
-        }
     }
 }
+

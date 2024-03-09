@@ -5,6 +5,7 @@ import static android.Manifest.permission.CAMERA;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Display;
@@ -13,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import androidx.annotation.NonNull;
 import androidx.camera.core.CameraSelector;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -397,11 +399,11 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
 //        bridge.getSavedCall(snapshotCallbackId).reject(message);
 //    }
 
-    @Override
-    public void onFocusSet(int pointX, int pointY) {}
-
-    @Override
-    public void onFocusSetError(String message) {}
+//    @Override
+//    public void onFocusSet(int pointX, int pointY) {}
+//
+//    @Override
+//    public void onFocusSetError(String message) {}
 
 //    @Override
 //    public void onBackButton() {}
@@ -411,6 +413,14 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
         PluginCall pluginCall = bridge.getSavedCall(cameraStartCallbackId);
         pluginCall.resolve();
         bridge.releaseCall(pluginCall);
+    }
+
+    @Override
+    public void onCameraDetected(@NonNull String rotation, Rect bounds) {
+        JSObject jsObject = new JSObject();
+        jsObject.put("rotation", rotation);
+        jsObject.put("bounds", bounds);
+        notifyListeners("cameraDetected", jsObject);
     }
 
 //    @Override
