@@ -419,7 +419,17 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
     public void onCameraDetected(@NonNull String rotation, Rect bounds) {
         JSObject jsObject = new JSObject();
         jsObject.put("rotation", rotation);
-        jsObject.put("bounds", bounds);
+        if (bounds != null) {
+            jsObject.put("x", bounds.left);
+            jsObject.put("y", bounds.top);
+            jsObject.put("width", bounds.right - bounds.left);
+            jsObject.put("height", bounds.bottom - bounds.top);
+        } else {
+            jsObject.put("x", 0);
+            jsObject.put("y", 0);
+            jsObject.put("width", 0);
+            jsObject.put("height", 0);
+        }
         notifyListeners("cameraDetected", jsObject);
     }
 
