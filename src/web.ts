@@ -21,10 +21,6 @@ export class CameraPreviewWeb extends WebPlugin implements CameraPreviewPlugin {
     });
   }
 
-  // async remove(): Promise<void> {
-  //   console.log('remove');
-  // }
-
   async start(options: CameraPreviewOptions): Promise<void> {
     return new Promise(async (resolve, reject) => {
       await navigator.mediaDevices
