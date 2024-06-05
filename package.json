@@ -20,7 +20,8 @@
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\"",
     "swiftlint": "node-swiftlint",
     "prepublishOnly": "npm run build",
-    "prepare": "husky install && npm run build"
+    "prepare": "husky install && npm run build",
+    "build:component": "rollup -c build/rollup.config.js"
   },
   "author": "Ariel Hernandez Musa",
   "license": "MIT",
