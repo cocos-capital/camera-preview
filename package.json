@@ -20,8 +20,7 @@
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\"",
     "swiftlint": "node-swiftlint",
     "prepublishOnly": "npm run build",
-    "prepare": "yarn build:component || npm run build:component",
-    "build:component": "rollup -c build/rollup.config.js"
+    "prepare": "husky install && npm run build"
   },
   "author": "Ariel Hernandez Musa",
   "license": "MIT",
@@ -44,7 +43,7 @@
     "typescript": "^4.3.2"
   },
   "peerDependencies": {
-    "@capacitor/core": "^5.0.0"
+    "@capacitor/core": "6.0.0"
   },
   "husky": {
     "hooks": {
