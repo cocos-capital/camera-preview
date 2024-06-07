@@ -105,7 +105,6 @@ public class CameraPreview: CAPPlugin {
                         }
 
                         call.resolve()
-
                     }
                 }
             }
