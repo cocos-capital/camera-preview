@@ -61,115 +61,121 @@ class CameraController: NSObject {
     var hasRecognizeFace: Bool = false
     
     var faceMetadataObjects = [AVMetadataFaceObject]()
+    
+    private var disableAudio = true
+    private var cameraPosition = "front"
 }
 
 extension CameraController {
+    private func createCaptureSession() {
+        self.captureSession = AVCaptureSession()
+    }
+
+    private func configureCaptureDevices() throws {
+
+        let session = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: AVMediaType.video, position: .unspecified)
+
+        let cameras = session.devices.compactMap { $0 }
+        guard !cameras.isEmpty else { throw CameraControllerError.noCamerasAvailable }
+
+        for camera in cameras {
+            if camera.position == .front {
+                self.frontCamera = camera
+            }
+
+            if camera.position == .back {
+                self.rearCamera = camera
+
+                try camera.lockForConfiguration()
+                camera.focusMode = .continuousAutoFocus
+                camera.unlockForConfiguration()
+            }
+        }
+        if disableAudio == false {
+            self.audioDevice = AVCaptureDevice.default(for: AVMediaType.audio)
+        }
+    }
+
+    private func configureDeviceInputs() throws {
+        guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
+
+        if cameraPosition == "rear" {
+            if let rearCamera = self.rearCamera {
+                self.rearCameraInput = try AVCaptureDeviceInput(device: rearCamera)
+
+                if captureSession.canAddInput(self.rearCameraInput!) { captureSession.addInput(self.rearCameraInput!) }
+
+                self.currentCameraPosition = .rear
+            }
+        } else if cameraPosition == "front" {
+            if let frontCamera = self.frontCamera {
+                self.frontCameraInput = try AVCaptureDeviceInput(device: frontCamera)
+
+                if captureSession.canAddInput(self.frontCameraInput!) { captureSession.addInput(self.frontCameraInput!) } else { throw CameraControllerError.inputsAreInvalid }
+
+                self.currentCameraPosition = .front
+            }
+        } else { throw CameraControllerError.noCamerasAvailable }
+
+        // Add audio input
+        if disableAudio == false {
+            if let audioDevice = self.audioDevice {
+                self.audioInput = try AVCaptureDeviceInput(device: audioDevice)
+                if captureSession.canAddInput(self.audioInput!) {
+                    captureSession.addInput(self.audioInput!)
+                } else {
+                    throw CameraControllerError.inputsAreInvalid
+                }
+            }
+        }
+    }
+
+    private func configurePhotoOutput() throws {
+        guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
+
+        self.photoOutput = AVCapturePhotoOutput()
+        self.photoOutput!.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])], completionHandler: nil)
+        self.photoOutput?.isHighResolutionCaptureEnabled = self.highResolutionOutput
+        if captureSession.canAddOutput(self.photoOutput!) { captureSession.addOutput(self.photoOutput!) }
+        captureSession.startRunning()
+    }
+
+    private func configureDataOutput() throws {
+        guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
+
+        self.dataOutput = AVCaptureVideoDataOutput()
+        self.dataOutput?.videoSettings = [
+            (kCVPixelBufferPixelFormatTypeKey as String): NSNumber(value: kCVPixelFormatType_32BGRA as UInt32)
+        ]
+        self.dataOutput?.alwaysDiscardsLateVideoFrames = true
+        if captureSession.canAddOutput(self.dataOutput!) {
+            captureSession.addOutput(self.dataOutput!)
+        }
+        
+        self.metadataOutput = AVCaptureMetadataOutput()
+        if (enableFaceRecognition && captureSession.canAddOutput(self.metadataOutput!)) {
+            captureSession.addOutput(self.metadataOutput!)
+            self.metadataOutput!.metadataObjectTypes = [.face]
+            self.metadataOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
+        }
+
+        captureSession.commitConfiguration()
+
+        let queue = DispatchQueue(label: "DataOutput", attributes: [])
+        self.dataOutput?.setSampleBufferDelegate(self, queue: queue)
+    }
+    
     func prepare(cameraPosition: String, disableAudio: Bool, completionHandler: @escaping (Error?) -> Void) {
-        func createCaptureSession() {
-            self.captureSession = AVCaptureSession()
-        }
-
-        func configureCaptureDevices() throws {
-
-            let session = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: AVMediaType.video, position: .unspecified)
-
-            let cameras = session.devices.compactMap { $0 }
-            guard !cameras.isEmpty else { throw CameraControllerError.noCamerasAvailable }
-
-            for camera in cameras {
-                if camera.position == .front {
-                    self.frontCamera = camera
-                }
-
-                if camera.position == .back {
-                    self.rearCamera = camera
-
-                    try camera.lockForConfiguration()
-                    camera.focusMode = .continuousAutoFocus
-                    camera.unlockForConfiguration()
-                }
-            }
-            if disableAudio == false {
-                self.audioDevice = AVCaptureDevice.default(for: AVMediaType.audio)
-            }
-        }
-
-        func configureDeviceInputs() throws {
-            guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
-
-            if cameraPosition == "rear" {
-                if let rearCamera = self.rearCamera {
-                    self.rearCameraInput = try AVCaptureDeviceInput(device: rearCamera)
-
-                    if captureSession.canAddInput(self.rearCameraInput!) { captureSession.addInput(self.rearCameraInput!) }
-
-                    self.currentCameraPosition = .rear
-                }
-            } else if cameraPosition == "front" {
-                if let frontCamera = self.frontCamera {
-                    self.frontCameraInput = try AVCaptureDeviceInput(device: frontCamera)
-
-                    if captureSession.canAddInput(self.frontCameraInput!) { captureSession.addInput(self.frontCameraInput!) } else { throw CameraControllerError.inputsAreInvalid }
-
-                    self.currentCameraPosition = .front
-                }
-            } else { throw CameraControllerError.noCamerasAvailable }
-
-            // Add audio input
-            if disableAudio == false {
-                if let audioDevice = self.audioDevice {
-                    self.audioInput = try AVCaptureDeviceInput(device: audioDevice)
-                    if captureSession.canAddInput(self.audioInput!) {
-                        captureSession.addInput(self.audioInput!)
-                    } else {
-                        throw CameraControllerError.inputsAreInvalid
-                    }
-                }
-            }
-        }
-
-        func configurePhotoOutput() throws {
-            guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
-
-            self.photoOutput = AVCapturePhotoOutput()
-            self.photoOutput!.setPreparedPhotoSettingsArray([AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])], completionHandler: nil)
-            self.photoOutput?.isHighResolutionCaptureEnabled = self.highResolutionOutput
-            if captureSession.canAddOutput(self.photoOutput!) { captureSession.addOutput(self.photoOutput!) }
-            captureSession.startRunning()
-        }
-
-        func configureDataOutput() throws {
-            guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
-
-            self.dataOutput = AVCaptureVideoDataOutput()
-            self.dataOutput?.videoSettings = [
-                (kCVPixelBufferPixelFormatTypeKey as String): NSNumber(value: kCVPixelFormatType_32BGRA as UInt32)
-            ]
-            self.dataOutput?.alwaysDiscardsLateVideoFrames = true
-            if captureSession.canAddOutput(self.dataOutput!) {
-                captureSession.addOutput(self.dataOutput!)
-            }
-            
-            self.metadataOutput = AVCaptureMetadataOutput()
-            if (enableFaceRecognition && captureSession.canAddOutput(self.metadataOutput!)) {
-                captureSession.addOutput(self.metadataOutput!)
-                self.metadataOutput!.metadataObjectTypes = [.face]
-                self.metadataOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-            }
-
-            captureSession.commitConfiguration()
-
-            let queue = DispatchQueue(label: "DataOutput", attributes: [])
-            self.dataOutput?.setSampleBufferDelegate(self, queue: queue)
-        }
-
-        DispatchQueue(label: "prepare").async {
+        self.cameraPosition = cameraPosition
+//        self.disableAudio = disableAudio
+        
+//        DispatchQueue(label: "prepare").async {
             do {
-                createCaptureSession()
-                try configureCaptureDevices()
-                try configureDeviceInputs()
-                try configurePhotoOutput()
-                try configureDataOutput()
+                self.createCaptureSession()
+                try self.configureCaptureDevices()
+                try self.configureDeviceInputs()
+                try self.configurePhotoOutput()
+                try self.configureDataOutput()
                 // try configureVideoOutput()
             } catch {
                 DispatchQueue.main.async {
@@ -182,7 +188,7 @@ extension CameraController {
             DispatchQueue.main.async {
                 completionHandler(nil)
             }
-        }
+//        }
     }
 
     func displayPreview(on view: UIView) throws {
