@@ -67,11 +67,11 @@ class CameraController: NSObject {
 }
 
 extension CameraController {
-    func createCaptureSession() {
+    private func createCaptureSession() {
         self.captureSession = AVCaptureSession()
     }
 
-    func configureCaptureDevices() throws {
+    private func configureCaptureDevices() throws {
 
         let session = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: AVMediaType.video, position: .unspecified)
 
@@ -96,7 +96,7 @@ extension CameraController {
         }
     }
 
-    func configureDeviceInputs() throws {
+    private func configureDeviceInputs() throws {
         guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
 
         if cameraPosition == "rear" {
@@ -130,7 +130,7 @@ extension CameraController {
         }
     }
 
-    func configurePhotoOutput() throws {
+    private func configurePhotoOutput() throws {
         guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
 
         self.photoOutput = AVCapturePhotoOutput()
@@ -140,7 +140,7 @@ extension CameraController {
         captureSession.startRunning()
     }
 
-    func configureDataOutput() throws {
+    private func configureDataOutput() throws {
         guard let captureSession = self.captureSession else { throw CameraControllerError.captureSessionIsMissing }
 
         self.dataOutput = AVCaptureVideoDataOutput()
@@ -169,7 +169,7 @@ extension CameraController {
         self.cameraPosition = cameraPosition
 //        self.disableAudio = disableAudio
         
-        DispatchQueue(label: "prepare").async {
+//        DispatchQueue(label: "prepare").async {
             do {
                 self.createCaptureSession()
                 try self.configureCaptureDevices()
@@ -188,7 +188,7 @@ extension CameraController {
             DispatchQueue.main.async {
                 completionHandler(nil)
             }
-        }
+//        }
     }
 
     func displayPreview(on view: UIView) throws {

@@ -76,7 +76,7 @@ public class CameraPreview: CAPPlugin {
                 return
             }
 
-            DispatchQueue.main.async {
+            DispatchQueue.global.async {
                 if self.cameraController.captureSession?.isRunning ?? false {
                     call.reject("camera already started")
                 } else {
