@@ -30,6 +30,10 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.ahm.capacitor.camera.preview.capacitorcamerapreview.databinding.NewCameraActivityBinding
+import com.google.mlkit.vision.barcode.BarcodeScanner
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
@@ -44,6 +48,7 @@ import java.util.concurrent.Executors
 
 
 typealias FaceRotationAnalyzerListener = (rotationAnalyzer: String, bounds: Rect?) -> Unit
+typealias QRCodeAnalyzerListener = (qrCode: String, bounds: Rect?) -> Unit
 
 class KNewCameraActivity : Fragment() {
     interface CameraPreviewListener {
@@ -51,6 +56,7 @@ class KNewCameraActivity : Fragment() {
         fun onPictureTakenError(message: String?)
         fun onCameraStarted()
         fun onCameraDetected(step: String, bounds: Rect?)
+        fun onQRCodeDetected(qrCode: String, bounds: Rect?)
     }
 
     private var eventListener: CameraPreviewListener? = null
@@ -62,6 +68,7 @@ class KNewCameraActivity : Fragment() {
     var toBack = false
     var storeToFile = false
     var enableFaceRecognition = false
+    var enableQRCodeRecognition = false
     var width = 0
     var height = 0
 
@@ -210,13 +217,23 @@ class KNewCameraActivity : Fragment() {
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
                     .also { it ->
-                        it.setAnalyzer(cameraExecutor, FaceAnalyzer { step, bounds ->
-                            Log.d(TAG, "Step: $step")
-                            bounds?.let { rect ->
-                                Log.d(TAG, "Bounds: ${rect.flattenToString()}")
-                            }
-                            eventListener?.onCameraDetected(step, bounds)
-                        })
+                        if (enableQRCodeRecognition) {
+                            it.setAnalyzer(cameraExecutor, QRCodeAnalyzer { qrCode, bounds ->
+                                Log.d(TAG, "QRCode: $qrCode")
+                                bounds?.let { rect ->
+                                    Log.d(TAG, "Bounds: ${rect.flattenToString()}")
+                                }
+                                eventListener?.onQRCodeDetected(qrCode, bounds)
+                            })
+                        } else if (enableFaceRecognition) {
+                            it.setAnalyzer(cameraExecutor, FaceAnalyzer { step, bounds ->
+                                Log.d(TAG, "Step: $step")
+                                bounds?.let { rect ->
+                                    Log.d(TAG, "Bounds: ${rect.flattenToString()}")
+                                }
+                                eventListener?.onCameraDetected(step, bounds)
+                            })
+                        }
                     }
 
                 // Select back camera as a default
@@ -227,13 +244,13 @@ class KNewCameraActivity : Fragment() {
                     cameraProvider.unbindAll()
 
                     // Bind use cases to camera
-                    if (enableFaceRecognition) {
+                    if (enableFaceRecognition || enableQRCodeRecognition) {
                         cameraProvider.bindToLifecycle(
                             this,
                             cameraSelector,
                             preview,
                             imageCapture,
-                            imageAnalyzer
+                            imageAnalyzer,
                         )
                     } else {
                         cameraProvider.bindToLifecycle(
@@ -316,6 +333,43 @@ class KNewCameraActivity : Fragment() {
                     }
                     .addOnFailureListener { e ->
                         Log.e(TAG, "Face detection failed: " + e.message)
+                    }
+                    .addOnCompleteListener { imageProxy.close() }
+            } else {
+                imageProxy.close()
+            }
+        }
+    }
+
+    private class QRCodeAnalyzer(listener: QRCodeAnalyzerListener? = null) : ImageAnalysis.Analyzer {
+        private val barCodeScannerOptions = BarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_PDF417)
+            .build()
+        private val qrCodeDetector: BarcodeScanner = BarcodeScanning.getClient(barCodeScannerOptions)
+        private val listeners = ArrayList<QRCodeAnalyzerListener>().apply { listener?.let { add(it) } }
+        private var qrCodeObjects: MutableList<Barcode> = ArrayList()
+
+        @ExperimentalGetImage
+        override fun analyze(imageProxy: ImageProxy) {
+            val mediaImage = imageProxy.image
+            if (mediaImage != null) {
+                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                qrCodeDetector.process(image)
+                    .addOnSuccessListener { qrCodes ->
+                        if (qrCodes.size == 0) {
+                            qrCodes.clear()
+                            listeners.forEach { it("NO_QRCODE", null) }
+                        } else if (qrCodes.size > 1) {
+                            qrCodes.clear()
+                            listeners.forEach { it("MORE_THAN_ONE_QRCODE", null) }
+                        } else {
+                            val qrCode = qrCodes[0]
+                            qrCodeObjects.add(qrCode)
+                            listeners.forEach { it(qrCode.rawValue ?: "", qrCode.boundingBox) }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "QRCode detection failed: " + e.message)
                     }
                     .addOnCompleteListener { imageProxy.close() }
             } else {

@@ -79,5 +79,9 @@ export interface CameraPreviewPlugin {
     eventName: 'faceRecognized',
     listenerFunc: (recognition: { step: string }) => void
   ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'qrCodeRecognized',
+    listenerFunc: (recognition: { qrCodeInformation: string }) => void
+  ): Promise<PluginListenerHandle>;
   removeAllListeners(): Promise<void>;
 }

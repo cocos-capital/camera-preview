@@ -169,6 +169,7 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
         final Boolean disableExifHeaderStripping = call.getBoolean("disableExifHeaderStripping", true);
         final Boolean lockOrientation = call.getBoolean("lockAndroidOrientation", false);
         final Boolean enableFaceRecognition = call.getBoolean("enableFaceRecognition", false);
+        final Boolean enableQRCodeRecognition = call.getBoolean("enableQRCodeRecognition", false);
         previousOrientationRequest = getBridge().getActivity().getRequestedOrientation();
 
         fragment = new KNewCameraActivity();
@@ -176,6 +177,7 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
         fragment.setDefaultCamera(position.equals("front") ? CameraSelector.DEFAULT_FRONT_CAMERA : CameraSelector.DEFAULT_BACK_CAMERA);
         fragment.setStoreToFile(storeToFile);
         fragment.setEnableFaceRecognition(enableFaceRecognition);
+        fragment.setEnableQRCodeRecognition(enableQRCodeRecognition);
         fragment.setToBack(toBack);
 
         bridge
@@ -302,6 +304,23 @@ public class CameraPreview extends Plugin implements KNewCameraActivity.CameraPr
             jsObject.put("height", 0);
         }
         notifyListeners("faceRecognized", jsObject);
+    }
+    @Override
+    public void onQRCodeDetected(@NonNull String qrCode, Rect bounds) {
+        JSObject jsObject = new JSObject();
+        jsObject.put("qrCodeInformation", qrCode);
+        if (bounds != null) {
+            jsObject.put("x", bounds.left);
+            jsObject.put("y", bounds.top);
+            jsObject.put("width", bounds.right - bounds.left);
+            jsObject.put("height", bounds.bottom - bounds.top);
+        } else {
+            jsObject.put("x", 0);
+            jsObject.put("y", 0);
+            jsObject.put("width", 0);
+            jsObject.put("height", 0);
+        }
+        notifyListeners("qrCodeRecognized", jsObject);
     }
 
     private boolean hasView(PluginCall call) {
