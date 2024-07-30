@@ -156,7 +156,7 @@ extension CameraController {
                 captureSession.addOutput(self.metadataOutput!)
                 var objTypes: [AVMetadataObject.ObjectType] = []
                 if (enableFaceRecognition) { objTypes.append(.face) }
-                if (enableQRCodeRecognition) { objTypes.append(.pdf417) }
+                if (enableQRCodeRecognition) { objTypes.append(contentsOf: [.pdf417, .qr]) }
                 self.metadataOutput!.metadataObjectTypes = objTypes
                 self.metadataOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
             }

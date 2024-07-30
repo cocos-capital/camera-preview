@@ -343,7 +343,7 @@ class KNewCameraActivity : Fragment() {
 
     private class QRCodeAnalyzer(listener: QRCodeAnalyzerListener? = null) : ImageAnalysis.Analyzer {
         private val barCodeScannerOptions = BarcodeScannerOptions.Builder()
-            .setBarcodeFormats(Barcode.FORMAT_PDF417)
+            .setBarcodeFormats(Barcode.FORMAT_PDF417, Barcode.FORMAT_QR_CODE)
             .build()
         private val qrCodeDetector: BarcodeScanner = BarcodeScanning.getClient(barCodeScannerOptions)
         private val listeners = ArrayList<QRCodeAnalyzerListener>().apply { listener?.let { add(it) } }
