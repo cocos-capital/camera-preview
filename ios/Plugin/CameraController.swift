@@ -10,7 +10,8 @@ import AVFoundation
 import UIKit
 
 protocol CameraControllerDelegate: NSObjectProtocol {
-    func hasRecognize(step: String, bounds: CGRect?)
+    func hasRecognizeFace(step: String, bounds: CGRect?)
+    func hasRecognizeQRCode(qrCodeInformation: String, bounds: CGRect?)
 }
 
 extension UIWindow {
@@ -53,12 +54,12 @@ class CameraController: NSObject {
 
     var highResolutionOutput: Bool = false
     var enableFaceRecognition: Bool = false
+    var enableQRCodeRecognition: Bool = false
 
     var audioDevice: AVCaptureDevice?
     var audioInput: AVCaptureDeviceInput?
 
     var zoomFactor: CGFloat = 1.0
-    var hasRecognizeFace: Bool = false
     
     var faceMetadataObjects = [AVMetadataFaceObject]()
 }
@@ -151,9 +152,12 @@ extension CameraController {
             }
             
             self.metadataOutput = AVCaptureMetadataOutput()
-            if (enableFaceRecognition && captureSession.canAddOutput(self.metadataOutput!)) {
+            if ((enableFaceRecognition || enableQRCodeRecognition) && captureSession.canAddOutput(self.metadataOutput!)) {
                 captureSession.addOutput(self.metadataOutput!)
-                self.metadataOutput!.metadataObjectTypes = [.face]
+                var objTypes: [AVMetadataObject.ObjectType] = []
+                if (enableFaceRecognition) { objTypes.append(.face) }
+                if (enableQRCodeRecognition) { objTypes.append(contentsOf: [.pdf417, .qr]) }
+                self.metadataOutput!.metadataObjectTypes = objTypes
                 self.metadataOutput!.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
             }
 
@@ -531,22 +535,37 @@ extension CameraController: AVCaptureMetadataOutputObjectsDelegate {
             
             let yawAvg = self.faceMetadataObjects.reduce(0, { $0 + ($1.yawAngle >= 180 ? $1.yawAngle - 360 : $1.yawAngle) }) / CGFloat(self.faceMetadataObjects.count)
             if (yawAvg > 20 && yawAvg < 80) {
-                delegate?.hasRecognize(step: "LEFT", bounds: viewBounds)
+                delegate?.hasRecognizeFace(step: "LEFT", bounds: viewBounds)
             } else if (yawAvg > -80 && yawAvg < -20) {
-                delegate?.hasRecognize(step: "RIGHT", bounds: viewBounds)
+                delegate?.hasRecognizeFace(step: "RIGHT", bounds: viewBounds)
             } else if (yawAvg > -10 && yawAvg < 10) {
-                delegate?.hasRecognize(step: "CENTER", bounds: viewBounds)
+                delegate?.hasRecognizeFace(step: "CENTER", bounds: viewBounds)
             }
+        }
+    }
+    
+    private func analyzeQRCode(_ qrCode: AVMetadataMachineReadableCodeObject) {
+        if let code = qrCode.stringValue {
+            delegate?.hasRecognizeQRCode(qrCodeInformation: code, bounds: nil)
         }
     }
     
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         if metadataObjects.count == 0 {
-            delegate?.hasRecognize(step: "NO_FACES", bounds: nil)
-        } else if metadataObjects.count > 1 {
-            delegate?.hasRecognize(step: "MORE_THAN_ONE_FACE", bounds: nil)
-        } else if let metadataObj = metadataObjects[0] as? AVMetadataFaceObject {
-            analyzeFace(metadataObj)
+            if (enableFaceRecognition) { delegate?.hasRecognizeFace(step: "NO_FACE", bounds: nil) }
+            if (enableQRCodeRecognition) { delegate?.hasRecognizeQRCode(qrCodeInformation: "NO_QRCODE", bounds: nil) }
+        } else if metadataObjects.count > 1 && enableFaceRecognition && !enableQRCodeRecognition  {
+            delegate?.hasRecognizeFace(step: "MORE_THAN_ONE_FACE", bounds: nil)
+        } else if metadataObjects.count > 1 && !enableFaceRecognition && enableQRCodeRecognition  {
+            delegate?.hasRecognizeQRCode(qrCodeInformation: "MORE_THAN_ONE_QRCODE", bounds: nil)
+        } else {
+            metadataObjects.forEach { obj in
+                if let face = obj as? AVMetadataFaceObject, enableFaceRecognition {
+                    analyzeFace(face)
+                } else if let qrCode = obj as? AVMetadataMachineReadableCodeObject, enableQRCodeRecognition {
+                    analyzeQRCode(qrCode)
+                }
+            }
         }
     }
 }

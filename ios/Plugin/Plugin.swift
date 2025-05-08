@@ -46,6 +46,7 @@ public class CameraPreview: CAPPlugin {
         self.highResolutionOutput = call.getBool("enableHighResolution") ?? false
         self.cameraController.highResolutionOutput = self.highResolutionOutput
         self.cameraController.enableFaceRecognition = call.getBool("enableFaceRecognition", false)
+        self.cameraController.enableQRCodeRecognition = call.getBool("enableQRCodeRecognition", false)
         self.cameraController.delegate = self
 
         if call.getInt("width") != nil {
@@ -241,7 +242,7 @@ public class CameraPreview: CAPPlugin {
 }
 
 extension CameraPreview: CameraControllerDelegate {
-    func hasRecognize(step: String, bounds: CGRect?) {
+    func hasRecognizeFace(step: String, bounds: CGRect?) {
         let data: [String : Any] = [
             "step": step,
             "x": bounds?.origin.x ?? 0,
@@ -250,5 +251,16 @@ extension CameraPreview: CameraControllerDelegate {
             "height": bounds?.height ?? 0,
         ]
         notifyListeners("faceRecognized", data: data)
+    }
+    
+    func hasRecognizeQRCode(qrCodeInformation: String, bounds: CGRect?) {
+        let data: [String : Any] = [
+            "qrCodeInformation": qrCodeInformation,
+            "x": bounds?.origin.x ?? 0,
+            "y": bounds?.origin.y ?? 0,
+            "width": bounds?.width ?? 0,
+            "height": bounds?.height ?? 0,
+        ]
+        notifyListeners("qrCodeRecognized", data: data)
     }
 }
